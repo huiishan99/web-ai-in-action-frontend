@@ -4,12 +4,16 @@
 import { Mic, MicOff } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-// 类型声明：增强 window 对象
+// 解决 TypeScript 无法识别 SpeechRecognition 类型问题
 declare global {
   interface Window {
     webkitSpeechRecognition: any;
   }
 }
+
+type WebSpeechEvent = {
+  results: SpeechRecognitionResultList;
+};
 
 interface MicButtonProps {
   onResult: (text: string) => void;
@@ -27,7 +31,7 @@ export default function MicButton({ onResult }: MicButtonProps) {
     recognition.lang = 'zh-CN';
     recognition.interimResults = false;
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: WebSpeechEvent) => {
       const result = event.results[0][0].transcript;
       onResult(result);
       setIsListening(false);
