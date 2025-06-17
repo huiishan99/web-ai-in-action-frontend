@@ -4,12 +4,14 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, BookOpen, Users, User } from 'lucide-react';
+import MicAssistant from './MicAssistant'; // ✅ 添加引用
 
 export default function Sidebar() {
-  const pathname = usePathname(); // 获取当前路径，用于激活状态判断
+  const pathname = usePathname();
 
   return (
     <aside className="w-60 h-screen bg-gradient-to-b from-blue-100 to-white p-4 flex flex-col items-center shadow-md">
+      {/* 头像与菜单部分 */}
       <div className="mb-8 text-center">
         <img
           src="/avatars/avatar.jpg"
@@ -22,12 +24,15 @@ export default function Sidebar() {
         </h2>
       </div>
 
-      <nav className="w-full space-y-4">
-        <SidebarItem icon={<Home size={20} />} label="Home" href="/" active={pathname === '/'} />
+      <nav className="w-full space-y-4 mb-auto">
+        <SidebarItem icon={<Home size={20} />} label="Home" href="/" active={pathname === '/new-home'} />
         <SidebarItem icon={<BookOpen size={20} />} label="Study" href="/study" active={pathname === '/study'} />
         <SidebarItem icon={<Users size={20} />} label="Community" href="/community" active={pathname === '/community'} />
         <SidebarItem icon={<User size={20} />} label="Me" href="/me" active={pathname === '/me'} />
       </nav>
+
+      {/* ✅ 底部语音识别按钮 */}
+      <MicAssistant />
     </aside>
   );
 }
