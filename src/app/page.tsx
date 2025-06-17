@@ -1,6 +1,6 @@
 // src/app/page.tsx
 import Sidebar from '@/components/Sidebar';
-import HomePageContent from '@/components/home/HomePageContent';
+// import HomePageContent from '@/components/home/HomePageContent';
 import HomePageContentV2 from '@/components/home/HomePageContentV2';
 
 export default function HomePage() {
