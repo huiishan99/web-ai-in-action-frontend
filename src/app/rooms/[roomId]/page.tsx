@@ -1,6 +1,6 @@
 // src/app/rooms/[roomId]/page.tsx
 import { notFound } from 'next/navigation';
-import { Metadata, ResolvingMetadata } from 'next';
+import { Metadata } from 'next';
 import { getRoomTheme, isValidRoomId } from '@/config/rooms';
 import RoomPageClient from './RoomPageClient';
 
