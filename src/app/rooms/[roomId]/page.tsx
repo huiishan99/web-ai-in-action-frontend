@@ -39,10 +39,9 @@ export async function generateStaticParams() {
   ];
 }
 
-// 正确标注元数据生成函数的类型
+// 正确标注元数据生成函数的类型（删除未使用参数）
 export async function generateMetadata(
-  { params }: RoomPageProps,
-  _parent: ResolvingMetadata
+  { params }: RoomPageProps
 ): Promise<Metadata> {
   const { roomId } = params;
 
