@@ -1,12 +1,24 @@
 // app/api/room-matching/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { MongoClient, Db, Collection, Document } from 'mongodb';
+
+// 定义房间类型结构
+interface Room {
+  roomId: string;
+  roomName: string;
+  roomType: string;
+  description: string;
+  maxCapacity: number;
+  currentUsers: number;
+  isActive: boolean;
+  matchScore: number;
+}
 
 // 导入你的 RoomMatcher 类
-// 注意：你需要将你的脚本转换为 ES6 模块或者适配 TypeScript
 class RoomMatcher {
-  private client: any;
-  private db: any;
-  private collection: any;
+  private client: MongoClient | null;
+  private db: Db | null;
+  private collection: Collection<Document> | null;
 
   constructor() {
     this.client = null;
@@ -15,8 +27,9 @@ class RoomMatcher {
   }
 
   async connect() {
-    const { MongoClient } = require('mongodb');
-    const MONGO_URI = process.env.MONGODB_URI || 'MONGODB_URI_REMOVED';
+    const MONGO_URI =
+      process.env.MONGODB_URI ||
+      'MONGODB_URI_REMOVED';
     const DB_NAME = 'room_matching_db';
     const COLLECTION_NAME = 'rooms';
 
@@ -33,6 +46,8 @@ class RoomMatcher {
   }
 
   async matchRoom(userSentiment: number, userHobbies: [number, number, number]) {
+    if (!this.collection) throw new Error('未连接数据库');
+
     try {
       const userVector = [userSentiment, ...userHobbies];
       console.log(`🔍 用户向量: [${userVector.join(', ')}]`);
@@ -40,12 +55,12 @@ class RoomMatcher {
       const pipeline = [
         {
           $vectorSearch: {
-            index: "room_vector_index",
-            path: "featureVector",
+            index: 'room_vector_index',
+            path: 'featureVector',
             queryVector: userVector,
             numCandidates: 10,
-            limit: 3
-          }
+            limit: 3,
+          },
         },
         {
           $project: {
@@ -56,13 +71,14 @@ class RoomMatcher {
             maxCapacity: 1,
             currentUsers: 1,
             isActive: 1,
-            matchScore: { $meta: "vectorSearchScore" }
-          }
-        }
+            matchScore: { $meta: 'vectorSearchScore' },
+          },
+        },
       ];
 
-      const allResults = await this.collection.aggregate(pipeline).toArray();
-      const activeResults = allResults.filter((room: any) => room.isActive === true);
+      // 进行聚合查询并筛选出活跃房间
+      const allResults = await this.collection.aggregate<Room>(pipeline).toArray();
+      const activeResults = allResults.filter((room: Room) => room.isActive === true);
 
       if (activeResults.length > 0) {
         return activeResults[0];
@@ -90,10 +106,7 @@ export async function POST(request: NextRequest) {
 
     // 验证输入参数
     if (typeof sentiment !== 'number' || !Array.isArray(hobbies) || hobbies.length !== 3) {
-      return NextResponse.json(
-        { error: '无效的参数格式' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: '无效的参数格式' }, { status: 400 });
     }
 
     // 创建房间匹配器实例
@@ -109,23 +122,21 @@ export async function POST(request: NextRequest) {
       // 返回匹配结果
       return NextResponse.json({
         success: true,
-        ...result
+        ...result,
       });
-
     } finally {
       // 确保连接被关闭
       await matcher.disconnect();
     }
-
   } catch (error) {
     console.error('房间匹配API错误:', error);
 
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : '未知错误'
+        error: error instanceof Error ? error.message : '未知错误',
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -134,6 +145,6 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     status: 'ok',
-    message: '房间匹配API运行正常'
+    message: '房间匹配API运行正常',
   });
 }
