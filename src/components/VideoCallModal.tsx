@@ -212,6 +212,7 @@ export default function VideoCallModal({ roomInfo, onClose }: VideoCallModalProp
         reject(error);
       };
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function isSessionDesc(o: unknown): o is RTCSessionDescriptionInit {
@@ -317,6 +318,7 @@ export default function VideoCallModal({ roomInfo, onClose }: VideoCallModalProp
       console.error('❌ 开始视频通话失败:', error);
       endVideoCall();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomInfo.videoRoomId, userId, getLocalStream, initializePeerConnection, connectWebSocket, isWaiting, isInCall, isWebSocketConnected, handleWebSocketMessage]);
 
   // 结束视频通话

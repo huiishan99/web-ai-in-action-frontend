@@ -102,6 +102,7 @@ const VideoCallApp: React.FC = () => {
         }
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
 
@@ -214,6 +215,7 @@ const VideoCallApp: React.FC = () => {
         endCall();
         break;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getLocalStream, initializePeerConnection]);
 
   // 处理来电

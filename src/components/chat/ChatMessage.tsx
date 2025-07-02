@@ -3,6 +3,7 @@
 
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 export default function ChatMessage({
   from,
@@ -34,9 +35,11 @@ export default function ChatMessage({
     >
       {/* 对方消息左侧头像 */}
       {!isMe && avatar && (
-        <img
+        <Image
           src={avatar}
           alt="avatar"
+          width={32}
+          height={32}
           className="w-8 h-8 rounded-full shadow-sm"
         />
       )}
@@ -59,9 +62,11 @@ export default function ChatMessage({
 
       {/* 自己消息右侧头像 */}
       {isMe && (
-        <img
+        <Image
           src="/avatars/avatar.jpg"
           alt="avatar"
+          width={32}
+          height={32}
           className="w-8 h-8 rounded-full shadow-sm"
         />
       )}
