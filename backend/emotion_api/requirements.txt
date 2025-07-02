@@ -5,7 +5,7 @@ python-multipart==0.0.9
 websockets==12.0
 
 # --- ✅ PyTorch + Vision ---
-torch==2.5.0
+torch==2.7.1
 torchvision==0.20.0
 
 # --- ✅ NLP + Google Cloud NLP ---
