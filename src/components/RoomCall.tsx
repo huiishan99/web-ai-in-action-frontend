@@ -3,7 +3,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Video, Phone, PhoneOff, Copy, CheckCircle, Users,
+  Phone, PhoneOff, Copy, CheckCircle, Users,
   Wifi, WifiOff, Settings, Music, Heart, Zap
 } from 'lucide-react';
 import { RoomTheme } from '@/types/room';
@@ -13,7 +13,7 @@ type ConnectionStatus = '未连接' | '正在连接WebSocket...' | '等待其他
 
 interface AnyWebSocketMessage {
   type: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface RoomCallProps {
@@ -174,56 +174,7 @@ export default function RoomCall({ roomTheme }: RoomCallProps) {
     }
   }, [isClient]);
 
-  // 连接 WebSocket
-  const connectWebSocket = useCallback(async (userId: string): Promise<WebSocket> => {
-    return new Promise((resolve, reject) => {
-      console.log(`🔌 连接 WebSocket: ${userId}`);
-      setConnectionStatus('正在连接WebSocket...');
-
-      const ws = new WebSocket(`${WS_BASE}/ws/${userId}`);
-
-      ws.onopen = () => {
-        console.log('✅ WebSocket 连接成功');
-        setIsWebSocketConnected(true);
-        setConnectionStatus('未连接');
-        resolve(ws);
-      };
-
-      ws.onmessage = async (event) => {
-        try {
-          const message: AnyWebSocketMessage = JSON.parse(event.data);
-          console.log('📨 收到 WebSocket 消息:', message.type);
-          await handleWebSocketMessage(message);
-        } catch (error) {
-          console.error('❌ 处理 WebSocket 消息失败:', error);
-        }
-      };
-
-      ws.onclose = (event) => {
-        console.log('🔌 WebSocket 连接关闭:', event.code, event.reason);
-        setIsWebSocketConnected(false);
-        if (!event.wasClean) {
-          setConnectionStatus('连接断开');
-          reconnectTimeoutRef.current = setTimeout(() => {
-            if (userId && !websocketRef.current) {
-              connectWebSocket(userId).then(newWs => {
-                websocketRef.current = newWs;
-              }).catch(console.error);
-            }
-          }, 3000);
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.error('❌ WebSocket 错误:', error);
-        setIsWebSocketConnected(false);
-        setConnectionStatus('连接失败');
-        reject(error);
-      };
-    });
-  }, []);
-
-  // 处理 WebSocket 消息
+// 处理 WebSocket 消息 - 移到{连接 WebSocket}功能之上
   const handleWebSocketMessage = useCallback(async (message: AnyWebSocketMessage) => {
     switch (message.type) {
       case 'room-joined':
@@ -295,6 +246,56 @@ export default function RoomCall({ roomTheme }: RoomCallProps) {
         break;
     }
   }, []);
+
+  // 连接 WebSocket
+  const connectWebSocket = useCallback(async (userId: string): Promise<WebSocket> => {
+    return new Promise((resolve, reject) => {
+      console.log(`🔌 连接 WebSocket: ${userId}`);
+      setConnectionStatus('正在连接WebSocket...');
+
+      const ws = new WebSocket(`${WS_BASE}/ws/${userId}`);
+
+      ws.onopen = () => {
+        console.log('✅ WebSocket 连接成功');
+        setIsWebSocketConnected(true);
+        setConnectionStatus('未连接');
+        resolve(ws);
+      };
+
+      ws.onmessage = async (event) => {
+        try {
+          const message: AnyWebSocketMessage = JSON.parse(event.data);
+          console.log('📨 收到 WebSocket 消息:', message.type);
+          await handleWebSocketMessage(message);
+        } catch (error) {
+          console.error('❌ 处理 WebSocket 消息失败:', error);
+        }
+      };
+
+      ws.onclose = (event) => {
+        console.log('🔌 WebSocket 连接关闭:', event.code, event.reason);
+        setIsWebSocketConnected(false);
+        if (!event.wasClean) {
+          setConnectionStatus('连接断开');
+          reconnectTimeoutRef.current = setTimeout(() => {
+            if (userId && !websocketRef.current) {
+              connectWebSocket(userId).then(newWs => {
+                websocketRef.current = newWs;
+              }).catch(console.error);
+            }
+          }, 3000);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('❌ WebSocket 错误:', error);
+        setIsWebSocketConnected(false);
+        setConnectionStatus('连接失败');
+        reject(error);
+      };
+    });
+  }, [handleWebSocketMessage]);
+
 
   // 开始视频通话
   const startVideoCall = useCallback(async () => {
