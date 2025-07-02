@@ -202,40 +202,33 @@ export default function RoomCall({ roomTheme }: RoomCallProps) {
           }
         }
         break;
-      case 'offer':
-        if (peerConnectionRef.current) {
-          try {
-            await peerConnectionRef.current.setRemoteDescription(message.offer);
-            const answer = await peerConnectionRef.current.createAnswer();
-            await peerConnectionRef.current.setLocalDescription(answer);
-            websocketRef.current?.send(JSON.stringify({
-              type: 'answer',
-              answer: answer
-            }));
-          } catch (error) {
-            console.error('❌ 处理 offer 失败:', error);
-          }
+      case 'offer': {
+        if (peerConnectionRef.current && 'offer' in message) {
+          // message.offer 由 unknown → RTCSessionDescriptionInit
+          const offer = message.offer as RTCSessionDescriptionInit;
+          await peerConnectionRef.current.setRemoteDescription(offer);
+
+          const answer = await peerConnectionRef.current.createAnswer();
+          await peerConnectionRef.current.setLocalDescription(answer);
+          websocketRef.current?.send(JSON.stringify({ type: 'answer', answer }));
         }
         break;
-      case 'answer':
-        if (peerConnectionRef.current) {
-          try {
-            await peerConnectionRef.current.setRemoteDescription(message.answer);
-          } catch (error) {
-            console.error('❌ 处理 answer 失败:', error);
-          }
+      }
+      case 'answer': {
+        if (peerConnectionRef.current && 'answer' in message) {
+          const answer = message.answer as RTCSessionDescriptionInit;
+          await peerConnectionRef.current.setRemoteDescription(answer);
         }
         break;
-      case 'ice-candidate':
-        if (peerConnectionRef.current) {
-          try {
-            const candidate = new RTCIceCandidate(message.candidate);
-            await peerConnectionRef.current.addIceCandidate(candidate);
-          } catch (error) {
-            console.error('❌ 添加 ICE candidate 失败:', error);
-          }
+      }
+      case 'ice-candidate': {
+        if (peerConnectionRef.current && 'candidate' in message) {
+          const candidateInit = message.candidate as RTCIceCandidateInit;
+          const candidate = new RTCIceCandidate(candidateInit);
+          await peerConnectionRef.current.addIceCandidate(candidate);
         }
         break;
+      }
       case 'user-left':
         setConnectionStatus('用户已离开');
         setIsInCall(false);
