@@ -2,6 +2,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Home, BookOpen, Users, User } from 'lucide-react';
 import MicAssistant from './MicAssistant'; // ✅ 添加引用
@@ -13,9 +14,11 @@ export default function Sidebar() {
     <aside className="w-60 h-screen bg-gradient-to-b from-blue-100 to-white p-4 flex flex-col items-center shadow-md">
       {/* 头像与菜单部分 */}
       <div className="mb-8 text-center">
-        <img
+        <Image
           src="/avatars/avatar.jpg"
           alt="User Avatar"
+          width={64}
+          height={64}
           className="w-16 h-16 rounded-full mx-auto"
         />
         <h2 className="mt-2 text-sm text-gray-700 font-semibold">

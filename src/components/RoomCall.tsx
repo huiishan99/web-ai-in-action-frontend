@@ -363,7 +363,7 @@ export default function RoomCall({ roomTheme }: RoomCallProps) {
     setIsWaiting(false);
     setIsWebSocketConnected(false);
     setConnectionStatus('未连接');
-  }, []);
+  }, [setIsInCall, setIsWaiting, setIsWebSocketConnected, setConnectionStatus]);
 
   // 复制房间号
   const copyRoomId = useCallback(async () => {
