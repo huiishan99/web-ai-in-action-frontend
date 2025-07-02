@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "dev:backend": "cd backend && python -m uvicorn websocket_server:app --host 0.0.0.0 --port 8000 --reload",
+    "dev:frontend": "next dev",
+    "dev:full": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "setup:backend": "cd backend && python -m venv venv && venv\\Scripts\\activate && pip install -r requirements.txt"
   },
   "dependencies": {
     "framer-motion": "^12.16.0",
@@ -22,6 +26,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^8.2.2",
     "eslint": "^9",
     "eslint-config-next": "15.3.3",
     "tailwindcss": "^4",
