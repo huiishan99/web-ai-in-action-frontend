@@ -1,6 +1,10 @@
 // src/components/home/HomePageContent.tsx
+"use client";
+
+import React from 'react';
 import ActivityCard from './ActivityCard';
 import QuickMatch from './QuickMatch';
+import FloatingVideoButton from '../FloatingVideoButton';
 import { Leaf, Clock, ShoppingCart, Gift } from 'lucide-react';
 
 export default function HomePageContent() {
@@ -32,25 +36,31 @@ export default function HomePageContent() {
   ];
 
   return (
-    <section className="flex flex-1 p-6 gap-6 bg-[#f9fafb]">
-      <div className="flex flex-col flex-1">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Activities</h2>
-        <p className="text-sm text-gray-600 mb-6">
-          The following are recommended activities. You can click on the modules you are interested in to learn more.
-        </p>
+    <>
+      {/* 您原有的所有代码完全不变 */}
+      <section className="flex flex-1 p-6 gap-6 bg-[#f9fafb]">
+        <div className="flex flex-col flex-1">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Activities</h2>
+          <p className="text-sm text-gray-600 mb-6">
+            The following are recommended activities. You can click on the modules you are interested in to learn more.
+          </p>
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          {activities.map((item) => (
-            <ActivityCard key={item.title} {...item} />
-          ))}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            {activities.map((item) => (
+              <ActivityCard key={item.title} {...item} />
+            ))}
+          </div>
+
+          <button className="self-end bg-green-500 text-white px-6 py-2 rounded-md shadow hover:bg-green-600 transition">
+            Explore
+          </button>
         </div>
 
-        <button className="self-end bg-green-500 text-white px-6 py-2 rounded-md shadow hover:bg-green-600 transition">
-          Explore
-        </button>
-      </div>
+        <QuickMatch />
+      </section>
 
-      <QuickMatch />
-    </section>
+      {/* 添加浮动视频通话按钮 */}
+      <FloatingVideoButton />
+    </>
   );
 }

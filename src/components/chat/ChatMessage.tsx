@@ -8,10 +8,12 @@ export default function ChatMessage({
   from,
   text,
   time = new Date(),
+  avatar,
 }: {
   from: 'me' | 'other';
   text: string;
   time?: Date;
+  avatar?: string; // 增加动态头像支持
 }) {
   const isMe = from === 'me';
 
@@ -30,9 +32,10 @@ export default function ChatMessage({
       transition={{ duration: 0.25 }}
       className={`flex ${isMe ? 'justify-end' : 'justify-start'} items-end gap-2`}
     >
-      {!isMe && (
+      {/* 对方消息左侧头像 */}
+      {!isMe && avatar && (
         <img
-          src="/avatars/avatar.jpg"
+          src={avatar}
           alt="avatar"
           className="w-8 h-8 rounded-full shadow-sm"
         />
@@ -54,6 +57,7 @@ export default function ChatMessage({
         )}
       </div>
 
+      {/* 自己消息右侧头像 */}
       {isMe && (
         <img
           src="/avatars/avatar.jpg"
