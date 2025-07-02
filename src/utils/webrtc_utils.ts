@@ -1,7 +1,36 @@
 // webrtc-utils.ts - WebRTC 相关的工具函数
 
+/** 轨道信息结构 */
+interface TrackInfo {
+  id: string;
+  kind: string;
+  label: string;
+  enabled: boolean;
+  muted: boolean;
+  readyState: MediaStreamTrackState;
+  constraints?: MediaTrackConstraints;
+  settings?: MediaTrackSettings;
+}
+
+/** PeerConnection 网络质量统计 */
+interface NetworkQualityStats {
+  rtt?: number;
+  packetsLost?: number;
+  jitter?: number;
+  bandwidth?: number;
+}
+
+/** PeerConnection 统计打印用（无需额外字段） */
+type RTCStatsAny =
+  | RTCIceCandidatePairStats
+  | RTCInboundRtpStreamStats
+  | RTCOutboundRtpStreamStats
+  | RTCStats;
+
+
+
 // 内联类型定义，避免导入 ./types
-export interface WebRTCConfig extends RTCConfiguration {}
+export interface WebRTCConfig extends RTCConfiguration { }
 
 /**
  * 默认的 WebRTC 配置
@@ -343,8 +372,7 @@ export function createWebSocketWithRetry(
       ws.onclose = (event) => {
         if (!event.wasClean && retryCount < maxRetries) {
           console.log(
-            `🔄 WebSocket 连接意外关闭，${
-              retryDelay * (retryCount + 1)
+            `🔄 WebSocket 连接意外关闭，${retryDelay * (retryCount + 1)
             }ms 后重试...`
           );
           retryCount++;
@@ -377,17 +405,8 @@ export function getStreamInfo(stream: MediaStream): {
 /**
  * 获取媒体轨道详细信息
  */
-export function getTrackInfo(track: MediaStreamTrack): {
-  id: string;
-  kind: string;
-  label: string;
-  enabled: boolean;
-  muted: boolean;
-  readyState: string;
-  constraints?: MediaTrackConstraints;
-  settings?: MediaTrackSettings;
-} {
-  const info: any = {
+export function getTrackInfo(track: MediaStreamTrack): TrackInfo {
+  const info: TrackInfo = {
     id: track.id,
     kind: track.kind,
     label: track.label,
@@ -396,21 +415,21 @@ export function getTrackInfo(track: MediaStreamTrack): {
     readyState: track.readyState,
   };
 
-  // 获取约束信息（如果支持）
-  if ("getConstraints" in track) {
+  // 约束
+  if ('getConstraints' in track) {
     try {
       info.constraints = track.getConstraints();
     } catch (e) {
-      console.warn("无法获取轨道约束:", e);
+      console.warn('无法获取轨道约束:', e);
     }
   }
 
-  // 获取设置信息（如果支持）
-  if ("getSettings" in track) {
+  // 设置
+  if ('getSettings' in track) {
     try {
       info.settings = track.getSettings();
     } catch (e) {
-      console.warn("无法获取轨道设置:", e);
+      console.warn('无法获取轨道设置:', e);
     }
   }
 
@@ -440,51 +459,54 @@ export async function logPeerConnectionStats(
 /**
  * 检查网络质量
  */
-export async function checkNetworkQuality(pc: RTCPeerConnection): Promise<{
-  rtt?: number;
-  packetsLost?: number;
-  jitter?: number;
-  bandwidth?: number;
-}> {
+export async function checkNetworkQuality(
+  pc: RTCPeerConnection,
+): Promise<NetworkQualityStats> {
+  const result: NetworkQualityStats = {};
+
   try {
     const stats = await pc.getStats();
-    const result: any = {};
-
-    stats.forEach((report) => {
-      if (
-        report.type === "candidate-pair" &&
-        (report as any).state === "succeeded"
-      ) {
-        result.rtt = (report as any).currentRoundTripTime;
-      }
-
-      if (
-        report.type === "inbound-rtp" &&
-        (report as any).mediaType === "video"
-      ) {
-        result.packetsLost = (report as any).packetsLost;
-        result.jitter = (report as any).jitter;
-      }
-
-      if (
-        report.type === "outbound-rtp" &&
-        (report as any).mediaType === "video"
-      ) {
-        const outboundReport = report as any;
-        if (outboundReport.bytesSent && outboundReport.timestamp) {
-          // 简单的带宽估算
-          result.bandwidth =
-            (outboundReport.bytesSent * 8) / (outboundReport.timestamp / 1000);
+    stats.forEach((report: RTCStatsAny) => {
+      // Candidate-pair RTT
+      if (report.type === 'candidate-pair') {
+        const pair = report as RTCIceCandidatePairStats;
+        if (pair.state === 'succeeded' && pair.currentRoundTripTime != null) {
+          result.rtt = pair.currentRoundTripTime;
         }
       }
+
+      // inbound-rtp（视频）
+      if (
+        report.type === 'inbound-rtp' &&
+        'mediaType' in report &&
+        report.mediaType === 'video'
+      ) {
+        const inbound = report as RTCInboundRtpStreamStats;
+        result.packetsLost = inbound.packetsLost;
+        result.jitter = inbound.jitter;
+      }
+
+      // outbound-rtp（视频带宽估算）
+      if (
+        report.type === 'outbound-rtp' &&
+        'mediaType' in report &&
+        report.mediaType === 'video'
+      ) {
+        const outbound = report as RTCOutboundRtpStreamStats;
+        if (outbound.bytesSent && outbound.timestamp) {
+          result.bandwidth = (outbound.bytesSent * 8) / (outbound.timestamp / 1000);
+        }
+      }
+
     });
 
     return result;
-  } catch (error) {
-    console.error("❌ 检查网络质量失败:", error);
+  } catch (err) {
+    console.error('❌ 检查网络质量失败:', err);
     return {};
   }
 }
+
 
 /**
  * 复制文本到剪贴板（兼容方案）
