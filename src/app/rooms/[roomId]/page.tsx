@@ -6,8 +6,8 @@ import { getRoomTheme, isValidRoomId } from '@/config/rooms';
 import RoomPageClient from './RoomPageClient';
 import type { PageProps } from '@/types/next'; // 使用你定义的类型
 
-export default function RoomPage({ params }: PageProps<{ roomId: string }>) {
-  const { roomId } = params;
+export default async function RoomPage({ params }: PageProps<{ roomId: string }>) {
+  const { roomId } = await params;
 
   if (!isValidRoomId(roomId)) {
     notFound();
@@ -34,7 +34,7 @@ export async function generateStaticParams() {
 export async function generateMetadata(
   { params }: PageProps<{ roomId: string }>
 ): Promise<Metadata> {
-  const { roomId } = params;
+  const { roomId } = await params;
 
   if (!isValidRoomId(roomId)) {
     return {
