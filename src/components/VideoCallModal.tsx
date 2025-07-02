@@ -4,7 +4,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Video, Phone, PhoneOff, Copy, CheckCircle, Users,
-  Wifi, WifiOff, Minimize2, X, Settings
+  Wifi, WifiOff, X
 } from 'lucide-react';
 
 // 类型定义
@@ -12,7 +12,7 @@ type ConnectionStatus = '未连接' | '正在连接WebSocket...' | '等待其他
 
 interface AnyWebSocketMessage {
   type: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface RoomInfo {
@@ -32,9 +32,11 @@ const WS_BASE = process.env.NODE_ENV === 'production'
   ? 'wss://your-backend-domain.com'
   : 'ws://localhost:8000';
 
+/* 没用到所以先注释掉
 const API_BASE = process.env.NODE_ENV === 'production'
   ? 'https://your-backend-domain.com'
   : 'http://localhost:8000';
+*/
 
 export default function VideoCallModal({ roomInfo, onClose }: VideoCallModalProps) {
   // 视频通话状态
@@ -44,7 +46,7 @@ export default function VideoCallModal({ roomInfo, onClose }: VideoCallModalProp
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('未连接');
   const [isWebSocketConnected, setIsWebSocketConnected] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
-  const [isMinimized, setIsMinimized] = useState<boolean>(false);
+  // const [isMinimized, setIsMinimized] = useState<boolean>(false); // 没用到
   const [isClient, setIsClient] = useState(false);
 
   // WebRTC refs - 使用 useRef 避免重渲染时重置
@@ -212,6 +214,12 @@ export default function VideoCallModal({ roomInfo, onClose }: VideoCallModalProp
     });
   }, []);
 
+  function isSessionDesc(o: unknown): o is RTCSessionDescriptionInit {
+    return typeof o === 'object' && o !== null && 'type' in o && 'sdp' in o;
+  }
+  function isCandidate(o: unknown): o is RTCIceCandidateInit {
+    return typeof o === 'object' && o !== null && 'candidate' in o;
+  }
   // 处理 WebSocket 消息
   const handleWebSocketMessage = useCallback(async (message: AnyWebSocketMessage) => {
     switch (message.type) {
@@ -241,37 +249,24 @@ export default function VideoCallModal({ roomInfo, onClose }: VideoCallModalProp
         }
         break;
       case 'offer':
-        if (peerConnectionRef.current) {
-          try {
-            await peerConnectionRef.current.setRemoteDescription(message.offer);
-            const answer = await peerConnectionRef.current.createAnswer();
-            await peerConnectionRef.current.setLocalDescription(answer);
-            websocketRef.current?.send(JSON.stringify({
-              type: 'answer',
-              answer: answer
-            }));
-          } catch (error) {
-            console.error('❌ 处理 offer 失败:', error);
-          }
+        if (peerConnectionRef.current && isSessionDesc(message.offer)) {
+          await peerConnectionRef.current.setRemoteDescription(message.offer);
+          const answer = await peerConnectionRef.current.createAnswer();
+          await peerConnectionRef.current.setLocalDescription(answer);
+          websocketRef.current?.send(
+            JSON.stringify({ type: 'answer', answer })
+          );
         }
         break;
       case 'answer':
-        if (peerConnectionRef.current) {
-          try {
-            await peerConnectionRef.current.setRemoteDescription(message.answer);
-          } catch (error) {
-            console.error('❌ 处理 answer 失败:', error);
-          }
+        if (peerConnectionRef.current && isSessionDesc(message.answer)) {
+          await peerConnectionRef.current.setRemoteDescription(message.answer);
         }
         break;
       case 'ice-candidate':
-        if (peerConnectionRef.current) {
-          try {
-            const candidate = new RTCIceCandidate(message.candidate);
-            await peerConnectionRef.current.addIceCandidate(candidate);
-          } catch (error) {
-            console.error('❌ 添加 ICE candidate 失败:', error);
-          }
+        if (peerConnectionRef.current && isCandidate(message.candidate)) {
+          const cand = new RTCIceCandidate(message.candidate);
+          await peerConnectionRef.current.addIceCandidate(cand);
         }
         break;
       case 'user-left':
@@ -322,7 +317,7 @@ export default function VideoCallModal({ roomInfo, onClose }: VideoCallModalProp
       console.error('❌ 开始视频通话失败:', error);
       endVideoCall();
     }
-  }, [roomInfo.videoRoomId, userId, getLocalStream, initializePeerConnection, connectWebSocket, isWaiting, isInCall, isWebSocketConnected]);
+  }, [roomInfo.videoRoomId, userId, getLocalStream, initializePeerConnection, connectWebSocket, isWaiting, isInCall, isWebSocketConnected, handleWebSocketMessage]);
 
   // 结束视频通话
   const endVideoCall = useCallback(() => {
