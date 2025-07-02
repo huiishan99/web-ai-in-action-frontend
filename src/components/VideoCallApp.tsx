@@ -122,63 +122,84 @@ const VideoCallApp: React.FC = () => {
     const msg = message as { type: string; [k: string]: unknown };
     switch (msg.type) {
       /* 将原来所有 message.xxx 改为 msg.xxx */
-      case 'room_matched':
-        // 房间匹配成功
-        if (peerConnectionRef.current && msg.peer_offer) {
-          await peerConnectionRef.current.setRemoteDescription(msg.peer_offer);
-          const answer = await peerConnectionRef.current.createAnswer();
-          await peerConnectionRef.current.setLocalDescription(answer);
-
-          // 发送 answer
-          wsRef.current?.send(JSON.stringify({
-            type: 'answer',
-            answer: answer,
-            target: msg.peer_id
-          }));
-        }
-        setIsInCall(true);
-        setIsWaiting(false);
-        break;
-
-      case 'incoming_call':
+        case 'room_matched': {
+          // 房间匹配成功
+          if (peerConnectionRef.current && msg.peer_offer) {
+            await peerConnectionRef.current.setRemoteDescription(
+              msg.peer_offer as RTCSessionDescriptionInit
+            );
+            const answer = await peerConnectionRef.current.createAnswer();
+            await peerConnectionRef.current.setLocalDescription(answer);
+            wsRef.current?.send(
+              JSON.stringify({ type: 'answer', answer, target: msg.peer_id })
+            );
+          }
+          setIsInCall(true);
+          setIsWaiting(false);
+          break;
+      }
+      case 'incoming_call': {
         // 收到呼叫
-        const accept = window.confirm(`${msg.from} 正在呼叫您，是否接受？`);
-        if (accept) {
-          await handleIncomingCall(message);
-        } else {
+        const accept = window.confirm(`${msg.from as string} 正在呼叫您，是否接受？`);
+        
+        // 类型判断
+        const incomingCall = msg as {
+          from?: unknown;
+          offer?: unknown;
+          call_id?: unknown;
+        };
+
+        if (
+          accept &&
+          typeof incomingCall.from === 'string' &&
+          typeof incomingCall.call_id === 'string' &&
+          typeof incomingCall.offer === 'object' &&
+          incomingCall.offer !== null &&
+          'type' in incomingCall.offer &&
+          'sdp' in incomingCall.offer
+        ) {
+          await handleIncomingCall({
+            from: incomingCall.from,
+            offer: incomingCall.offer as RTCSessionDescriptionInit,
+            call_id: incomingCall.call_id
+          });
+        } else if (!accept && typeof incomingCall.call_id === 'string') {
           // 拒绝呼叫
-          fetch('/api/answer-call', {
+          await fetch('/api/answer-call', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              call_id: msg.call_id,
+              call_id: incomingCall.call_id,
               accept: false
             })
           });
         }
         break;
-
-      case 'call_accepted':
+      }
+      case 'call_accepted': {
         // 呼叫被接受
         if (peerConnectionRef.current && msg.answer) {
-          await peerConnectionRef.current.setRemoteDescription(msg.answer);
+          const answer = msg.answer as RTCSessionDescriptionInit;
+          await peerConnectionRef.current.setRemoteDescription(answer);
           setIsInCall(true);
           setConnectionStatus('已连接');
         }
         break;
-
+      }
       case 'call_rejected':
         // 呼叫被拒绝
         alert('对方拒绝了您的呼叫');
         endCall();
         break;
 
-      case 'ice_candidate':
-        // ICE 候选
+      case 'ice_candidate': {
+        // 收到 ICE 候选
         if (peerConnectionRef.current && msg.candidate) {
-          await peerConnectionRef.current.addIceCandidate(msg.candidate);
+          const cand = msg.candidate as RTCIceCandidateInit;
+          await peerConnectionRef.current.addIceCandidate(cand);
         }
         break;
+      }
 
       case 'user_status':
         // 用户状态更新
