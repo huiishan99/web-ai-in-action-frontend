@@ -4,6 +4,7 @@
 import React, { useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { Video, X, Minimize2 } from 'lucide-react';
+import { ROOM_CONFIGS } from '@/config/rooms';
 
 // 动态导入 RoomCall 组件，避免 SSR 问题
 const RoomCall = dynamic(() => import('./RoomCall'), {
@@ -116,7 +117,7 @@ export default function FloatingVideoButton() {
           </div>
 
           {/* 使用动态导入的 RoomCall 组件 */}
-          <RoomCall />
+          <RoomCall roomTheme={ROOM_CONFIGS.neutral.theme} />
         </div>
       )}
     </>
