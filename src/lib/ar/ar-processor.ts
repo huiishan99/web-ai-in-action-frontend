@@ -1,20 +1,55 @@
-// lib/ar/ar-processor.ts - 可运行的简化版本
-import type { ARConfig, ARStats } from '../../types';
+// lib/ar/ar-processor.ts
+import type { ARConfig, ARStats } from '../../components/types';
 
+/* ------------------------------------------------------------------ */
+/*               MediaPipe FaceMesh 最小运行时类型描述                 */
+/* ------------------------------------------------------------------ */
+interface FaceLandmark {
+  x: number;
+  y: number;
+  z?: number;
+}
+
+interface FaceMeshResults {
+  /* MediaPipe 会返回 multiFaceLandmarks */
+  multiFaceLandmarks?: FaceLandmark[][];
+}
+
+interface FaceMeshOptions {
+  maxNumFaces: number;
+  refineLandmarks: boolean;
+  minDetectionConfidence: number;
+  minTrackingConfidence: number;
+}
+
+interface FaceMesh {
+  setOptions(opts: FaceMeshOptions): void;
+  onResults(cb: (res: FaceMeshResults) => void): void;
+  send(data: { image: HTMLVideoElement }): Promise<void>;
+  close(): void;
+}
+
+/* ------------------------------------------------------------------ */
+/*                           ARProcessor                              */
+/* ------------------------------------------------------------------ */
 export class ARProcessor {
-  private faceMesh: any = null;
+  private faceMesh: FaceMesh | null = null;
+
   private sourceVideo: HTMLVideoElement | null = null;
   private outputCanvas: HTMLCanvasElement | null = null;
   private outputContext: CanvasRenderingContext2D | null = null;
   private animationFrameId: number | null = null;
+
   private isProcessing = false;
   private lastFrameTime = 0;
   private frameCount = 0;
   private fpsStartTime = 0;
+
   private config: ARConfig;
   private stats: ARStats;
+
   private errorCount = 0;
-  private maxErrors = 5;
+  private readonly maxErrors = 5;
 
   constructor(config: Partial<ARConfig> = {}) {
     this.config = {
@@ -26,7 +61,7 @@ export class ARProcessor {
       targetHeight: 480,
       maxProcessingFPS: 15,
       fallbackEnabled: true,
-      ...config
+      ...config,
     };
 
     this.stats = {
@@ -35,160 +70,148 @@ export class ARProcessor {
       processingFPS: 0,
       lastError: null,
       memoryUsage: 0,
-      processingTime: 0
+      processingTime: 0,
     };
   }
 
-  // 检查浏览器兼容性
+  /* ------------------------ 兼容性检查 ------------------------ */
   private checkCompatibility(): { supported: boolean; issues: string[] } {
     const issues: string[] = [];
 
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      issues.push('浏览器不支持getUserMedia');
+    if (!navigator.mediaDevices?.getUserMedia) {
+      issues.push('浏览器不支持 getUserMedia');
     }
 
     try {
-      const testCanvas = document.createElement('canvas');
-      const ctx = testCanvas.getContext('2d');
-      if (!ctx) {
-        issues.push('Canvas 2D context不可用');
-      }
-    } catch (error) {
-      issues.push('Canvas创建失败');
+      const ctx = document.createElement('canvas').getContext('2d');
+      if (!ctx) issues.push('Canvas 2D context 不可用');
+    } catch {
+      issues.push('Canvas 创建失败');
     }
 
-    // 简化WebGL检查
     try {
-      const testCanvas = document.createElement('canvas');
-      const gl = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
-      if (!gl) {
-        issues.push('WebGL不支持，AR功能受限');
-      }
-    } catch (error) {
-      console.warn('WebGL检测失败，使用降级模式');
+      const glCanvas = document.createElement('canvas');
+      const gl = glCanvas.getContext('webgl')
+        || glCanvas.getContext('experimental-webgl');
+      if (!gl) issues.push('WebGL 不支持，AR 功能受限');
+    } catch {
+      // WebGL 检测失败仅告警
+      console.warn('WebGL 检测失败，使用降级模式');
     }
 
-    return {
-      supported: issues.length === 0,
-      issues
-    };
+    return { supported: issues.length === 0, issues };
   }
 
-  // 简化的初始化方法
+  /* ------------------------- 初始化 --------------------------- */
   async initialize(): Promise<boolean> {
-    console.log('🔄 开始初始化AR处理器...');
+    console.log('🔄 开始初始化 AR 处理器 …');
 
     try {
-      // 兼容性检查
-      const compatibility = this.checkCompatibility();
-      if (!compatibility.supported) {
-        throw new Error(`浏览器兼容性检查失败: ${compatibility.issues.join(', ')}`);
+      const { supported, issues } = this.checkCompatibility();
+      if (!supported) {
+        throw new Error(`浏览器兼容性检查失败: ${issues.join(', ')}`);
       }
 
-      // 尝试加载 MediaPipe (使用动态脚本加载)
-      const success = await this.loadMediaPipe();
-      if (!success) {
-        throw new Error('MediaPipe加载失败，使用模拟模式');
+      if (!(await this.loadMediaPipe())) {
+        throw new Error('MediaPipe 加载失败，使用模拟模式');
       }
 
-      // 创建输出Canvas
+      // 创建输出 Canvas
       this.outputCanvas = document.createElement('canvas');
       this.outputCanvas.width = this.config.targetWidth;
       this.outputCanvas.height = this.config.targetHeight;
       this.outputContext = this.outputCanvas.getContext('2d');
 
       if (!this.outputContext) {
-        throw new Error('无法创建Canvas 2D context');
+        throw new Error('无法创建 Canvas 2D context');
       }
 
       this.stats.isInitialized = true;
       this.stats.lastError = null;
-      console.log('✅ AR处理器初始化成功');
+      console.log('✅ AR 处理器初始化成功');
       return true;
-
-    } catch (error) {
-      console.error('❌ AR处理器初始化失败:', error);
-      this.stats.lastError = error instanceof Error ? error.message : 'Unknown error';
-
-      // 降级到模拟模式
+    } catch (err) {
+      console.error('❌ AR 处理器初始化失败:', err);
+      this.stats.lastError =
+        err instanceof Error ? err.message : 'Unknown error';
       return this.initializeMockMode();
     }
   }
 
-  // 降级：模拟模式初始化
+  /* --------------------- 模拟（降级）模式 --------------------- */
   private async initializeMockMode(): Promise<boolean> {
-    console.log('⚠️ 初始化模拟AR模式（用于开发测试）');
-
+    console.log('⚠️ 初始化模拟 AR 模式（用于开发测试）');
     try {
       this.outputCanvas = document.createElement('canvas');
       this.outputCanvas.width = this.config.targetWidth;
       this.outputCanvas.height = this.config.targetHeight;
       this.outputContext = this.outputCanvas.getContext('2d');
-
-      if (!this.outputContext) {
-        return false;
-      }
+      if (!this.outputContext) return false;
 
       this.stats.isInitialized = true;
-      this.stats.lastError = 'Running in mock mode - MediaPipe not available';
+      this.stats.lastError = 'Running in mock mode – MediaPipe not available';
       return true;
-    } catch (error) {
-      console.error('❌ 模拟模式初始化失败:', error);
+    } catch (err) {
+      console.error('❌ 模拟模式初始化失败:', err);
       return false;
     }
   }
 
-  // 动态加载 MediaPipe
-  private async loadMediaPipe(): Promise<boolean> {
-    try {
-      // 检查是否已经加载
-      if ((window as any).FaceMesh) {
-        console.log('✅ MediaPipe already loaded');
-        await this.initializeFaceMesh();
-        return true;
-      }
-
-      // 动态加载脚本
-      await this.loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js');
-      await this.loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js');
-      await this.loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js');
-      await this.loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js');
-
-      // 等待一下确保脚本加载完成
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      if (!(window as any).FaceMesh) {
-        throw new Error('MediaPipe FaceMesh not found after loading');
-      }
-
-      await this.initializeFaceMesh();
-      return true;
-
-    } catch (error) {
-      console.error('❌ MediaPipe加载失败:', error);
-      return false;
-    }
-  }
-
-  // 加载外部脚本
+  /* ---------------------- 动态加载脚本 ----------------------- */
   private loadScript(src: string): Promise<void> {
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = src;
       script.onload = () => resolve();
-      script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+      script.onerror = () => reject(new Error(`Failed to load ${src}`));
       document.head.appendChild(script);
     });
   }
 
-  // 初始化FaceMesh
-  private async initializeFaceMesh(): Promise<void> {
-    const FaceMesh = (window as any).FaceMesh;
-
-    this.faceMesh = new FaceMesh({
-      locateFile: (file: string) => {
-        return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+  private async loadMediaPipe(): Promise<boolean> {
+    try {
+      if ((window as unknown as { FaceMesh?: FaceMesh }).FaceMesh) {
+        console.log('✅ MediaPipe 已经加载');
+        await this.initializeFaceMesh();
+        return true;
       }
+
+      await this.loadScript(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js',
+      );
+      await this.loadScript(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js',
+      );
+      await this.loadScript(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js',
+      );
+      await this.loadScript(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js',
+      );
+
+      await new Promise((r) => setTimeout(r, 1000));
+
+      if (!(window as unknown as { FaceMesh?: FaceMesh }).FaceMesh) {
+        throw new Error('MediaPipe FaceMesh 未找到');
+      }
+
+      await this.initializeFaceMesh();
+      return true;
+    } catch (err) {
+      console.error('❌ MediaPipe 加载失败:', err);
+      return false;
+    }
+  }
+
+  /* ---------------------- 初始化 FaceMesh --------------------- */
+  private async initializeFaceMesh(): Promise<void> {
+    const FaceMeshCtor =
+      (window as unknown as { FaceMesh: new (cfg: unknown) => FaceMesh })
+        .FaceMesh;
+
+    this.faceMesh = new FaceMeshCtor({
+      locateFile: (file: string) =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
     });
 
     this.faceMesh.setOptions({
@@ -198,127 +221,119 @@ export class ARProcessor {
       minTrackingConfidence: this.config.minTrackingConfidence,
     });
 
-    this.faceMesh.onResults((results: any) => {
-      this.handleFaceMeshResults(results);
-    });
+    this.faceMesh.onResults((results) => this.handleFaceMeshResults(results));
   }
 
-  // 处理MediaPipe结果或模拟结果
-  private handleFaceMeshResults(results: any): void {
+  /* ---------------- 处理 FaceMesh / 模拟 结果 ---------------- */
+  private handleFaceMeshResults(results: FaceMeshResults | null): void {
     if (!this.outputContext || !this.outputCanvas) return;
 
     try {
-      const processStart = performance.now();
+      const t0 = performance.now();
 
-      // 清空Canvas
-      this.outputContext.clearRect(0, 0, this.outputCanvas.width, this.outputCanvas.height);
+      // 清空画布并绘制原始帧
+      this.outputContext.clearRect(
+        0,
+        0,
+        this.outputCanvas.width,
+        this.outputCanvas.height,
+      );
 
-      // 绘制原始视频帧
       if (this.sourceVideo) {
         this.outputContext.drawImage(
           this.sourceVideo,
-          0, 0,
+          0,
+          0,
           this.outputCanvas.width,
-          this.outputCanvas.height
+          this.outputCanvas.height,
         );
       }
 
-      // 检测到人脸时的处理
-      if (results && results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+      // 是否检测到人脸
+      const landmarks =
+        results?.multiFaceLandmarks?.[0] ?? (this.faceMesh ? null : undefined);
+
+      if (landmarks) {
         this.stats.faceDetected = true;
-        this.drawSimpleFaceIndicator(results.multiFaceLandmarks[0]);
+        if (landmarks !== undefined) this.drawSimpleFaceIndicator(landmarks);
       } else {
         this.stats.faceDetected = false;
-        // 模拟模式：随机显示人脸检测
+        // 模拟模式下随机展示
         if (!this.faceMesh && Math.random() > 0.7) {
           this.stats.faceDetected = true;
           this.drawMockFaceIndicator();
         }
       }
 
-      this.stats.processingTime = performance.now() - processStart;
+      this.stats.processingTime = performance.now() - t0;
       this.updateFPSStats();
-
-    } catch (error) {
-      console.error('❌ 处理结果失败:', error);
-      this.handleError(error);
+    } catch (err) {
+      console.error('❌ 处理结果失败:', err);
+      this.handleError(err);
     }
   }
 
-  // 绘制简单的人脸指示器
-  private drawSimpleFaceIndicator(landmarks: any[]): void {
+  private drawSimpleFaceIndicator(
+    landmarks: FaceLandmark[],
+  ): void {
     if (!this.outputContext || !this.outputCanvas) return;
 
-    try {
-      this.outputContext.strokeStyle = '#00FF00';
-      this.outputContext.lineWidth = 2;
-      this.outputContext.fillStyle = '#00FF00';
-
-      // 绘制关键点
-      const keyPoints = [
-        landmarks[33],  // 左眼
-        landmarks[263], // 右眼
-        landmarks[1],   // 鼻尖
-        landmarks[61],  // 嘴巴左
-        landmarks[291], // 嘴巴右
-      ];
-
-      keyPoints.forEach(point => {
-        if (point) {
-          const x = point.x * this.outputCanvas!.width;
-          const y = point.y * this.outputCanvas!.height;
-
-          this.outputContext!.beginPath();
-          this.outputContext!.arc(x, y, 3, 0, 2 * Math.PI);
-          this.outputContext!.fill();
-        }
-      });
-
-    } catch (error) {
-      console.error('❌ 绘制人脸指示器失败:', error);
-    }
-  }
-
-  // 模拟模式：绘制假的人脸指示器
-  private drawMockFaceIndicator(): void {
-    if (!this.outputContext || !this.outputCanvas) return;
-
-    this.outputContext.strokeStyle = '#FF6600';
+    this.outputContext.strokeStyle = '#00FF00';
     this.outputContext.lineWidth = 2;
-    this.outputContext.fillStyle = '#FF6600';
+    this.outputContext.fillStyle = '#00FF00';
 
-    // 在画面中心绘制几个模拟的关键点
-    const centerX = this.outputCanvas.width / 2;
-    const centerY = this.outputCanvas.height / 2;
+    const keyPoints = [33, 263, 1, 61, 291]
+      .map((idx) => landmarks[idx])
+      .filter(Boolean);
 
-    const mockPoints = [
-      { x: centerX - 40, y: centerY - 20 }, // 左眼
-      { x: centerX + 40, y: centerY - 20 }, // 右眼
-      { x: centerX, y: centerY },           // 鼻尖
-      { x: centerX - 20, y: centerY + 30 }, // 嘴巴左
-      { x: centerX + 20, y: centerY + 30 }, // 嘴巴右
-    ];
-
-    mockPoints.forEach(point => {
+    keyPoints.forEach((pt) => {
+      const x = pt.x * this.outputCanvas!.width;
+      const y = pt.y * this.outputCanvas!.height;
       this.outputContext!.beginPath();
-      this.outputContext!.arc(point.x, point.y, 3, 0, 2 * Math.PI);
+      this.outputContext!.arc(x, y, 3, 0, 2 * Math.PI);
       this.outputContext!.fill();
     });
-
-    // 添加"MOCK"标识
-    this.outputContext.font = '12px Arial';
-    this.outputContext.fillText('MOCK AR', 10, 20);
   }
 
-  // 开始处理视频流
-  async processVideoStream(video: HTMLVideoElement): Promise<MediaStream | null> {
+  private drawMockFaceIndicator(): void {
+    if (!this.outputContext || !this.outputCanvas) return;
+    const ctx = this.outputContext;
+    ctx.strokeStyle = '#FF6600';
+    ctx.fillStyle = '#FF6600';
+    ctx.lineWidth = 2;
+
+    const { width, height } = this.outputCanvas;
+    const cx = width / 2;
+    const cy = height / 2;
+
+    const pts = [
+      { x: cx - 40, y: cy - 20 },
+      { x: cx + 40, y: cy - 20 },
+      { x: cx, y: cy },
+      { x: cx - 20, y: cy + 30 },
+      { x: cx + 20, y: cy + 30 },
+    ];
+
+    pts.forEach(({ x, y }) => {
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, 2 * Math.PI);
+      ctx.fill();
+    });
+
+    ctx.font = '12px Arial';
+    ctx.fillText('MOCK AR', 10, 20);
+  }
+
+  /* ---------------------- 视频流处理主流程 -------------------- */
+  async processVideoStream(
+    video: HTMLVideoElement,
+  ): Promise<MediaStream | null> {
     if (!this.stats.isInitialized) {
-      console.warn('⚠️ AR处理器未初始化，返回原始流');
+      console.warn('⚠️ AR 处理器未初始化，返回原始流');
       return null;
     }
-
     if (this.isProcessing) {
-      console.warn('⚠️ AR处理器已在运行中');
+      console.warn('⚠️ AR 处理器已在运行中');
       return null;
     }
 
@@ -327,206 +342,167 @@ export class ARProcessor {
       this.isProcessing = true;
       this.errorCount = 0;
 
-      // 等待视频准备就绪
       await this.waitForVideoReady(video);
-
-      // 同步尺寸
       this.syncDimensions(video);
-
-      // 开始处理循环
       this.startProcessingLoop();
 
-      // 从Canvas创建MediaStream
-      const stream = this.outputCanvas?.captureStream(this.config.maxProcessingFPS);
-      if (!stream) {
-        throw new Error('无法从Canvas创建MediaStream');
-      }
+      const stream = this.outputCanvas?.captureStream(
+        this.config.maxProcessingFPS,
+      );
+      if (!stream) throw new Error('无法从 Canvas 创建 MediaStream');
 
-      console.log('✅ AR视频流处理开始');
+      console.log('✅ AR 视频流处理开始');
       return stream;
-
-    } catch (error) {
-      console.error('❌ 开始视频流处理失败:', error);
-      this.handleError(error);
+    } catch (err) {
+      console.error('❌ 开始视频流处理失败:', err);
+      this.handleError(err);
       return null;
     }
   }
 
-  // 等待视频准备就绪
   private waitForVideoReady(video: HTMLVideoElement): Promise<void> {
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('视频准备超时'));
-      }, 5000);
+      const timeout = setTimeout(
+        () => reject(new Error('视频准备超时')),
+        5000,
+      );
 
-      const checkReady = () => {
-        if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+      const check = () => {
+        if (video.readyState >= 2 && video.videoWidth && video.videoHeight) {
           clearTimeout(timeout);
           resolve();
         } else {
-          setTimeout(checkReady, 100);
+          setTimeout(check, 100);
         }
       };
-
-      checkReady();
+      check();
     });
   }
 
-  // 同步Canvas和Video尺寸
   private syncDimensions(video: HTMLVideoElement): void {
     if (!this.outputCanvas) return;
 
-    const videoWidth = video.videoWidth;
-    const videoHeight = video.videoHeight;
+    const { videoWidth: w, videoHeight: h } = video;
+    const ratio = w / h;
+    const targetRatio = this.config.targetWidth / this.config.targetHeight;
 
-    console.log(`📐 视频尺寸: ${videoWidth}x${videoHeight}`);
+    let cw = this.config.targetWidth;
+    let ch = this.config.targetHeight;
 
-    // 保持宽高比
-    const aspectRatio = videoWidth / videoHeight;
-    const targetAspectRatio = this.config.targetWidth / this.config.targetHeight;
-
-    let canvasWidth = this.config.targetWidth;
-    let canvasHeight = this.config.targetHeight;
-
-    if (Math.abs(aspectRatio - targetAspectRatio) > 0.1) {
-      if (aspectRatio > targetAspectRatio) {
-        canvasHeight = canvasWidth / aspectRatio;
-      } else {
-        canvasWidth = canvasHeight * aspectRatio;
-      }
+    if (Math.abs(ratio - targetRatio) > 0.1) {
+      ratio > targetRatio ? (ch = cw / ratio) : (cw = ch * ratio);
     }
 
-    this.outputCanvas.width = Math.round(canvasWidth);
-    this.outputCanvas.height = Math.round(canvasHeight);
-
-    console.log(`📐 Canvas尺寸: ${this.outputCanvas.width}x${this.outputCanvas.height}`);
+    this.outputCanvas.width = Math.round(cw);
+    this.outputCanvas.height = Math.round(ch);
   }
 
-  // 开始处理循环
   private startProcessingLoop(): void {
-    const processFrame = async () => {
-      if (!this.isProcessing || !this.sourceVideo) {
-        return;
-      }
-
+    const loop = async () => {
+      if (!this.isProcessing || !this.sourceVideo) return;
       try {
         const now = performance.now();
-        const timeSinceLastFrame = now - this.lastFrameTime;
-        const targetFrameTime = 1000 / this.config.maxProcessingFPS;
-
-        if (timeSinceLastFrame >= targetFrameTime) {
+        if (
+          now - this.lastFrameTime >=
+          1000 / this.config.maxProcessingFPS
+        ) {
           this.lastFrameTime = now;
-
-          // 发送给MediaPipe或模拟处理
           if (this.faceMesh) {
             await this.faceMesh.send({ image: this.sourceVideo });
           } else {
-            // 模拟处理
             this.handleFaceMeshResults(null);
           }
         }
-
-        this.animationFrameId = requestAnimationFrame(processFrame);
-
-      } catch (error) {
-        console.error('❌ 处理帧失败:', error);
-        this.handleError(error);
+        this.animationFrameId = requestAnimationFrame(loop);
+      } catch (err) {
+        console.error('❌ 处理帧失败:', err);
+        this.handleError(err);
       }
     };
-
-    this.animationFrameId = requestAnimationFrame(processFrame);
+    this.animationFrameId = requestAnimationFrame(loop);
   }
 
-  // 更新FPS统计
+  /* ------------------------ 性能统计 ------------------------- */
   private updateFPSStats(): void {
-    this.frameCount++;
+    this.frameCount += 1;
     const now = performance.now();
 
-    if (this.fpsStartTime === 0) {
+    if (!this.fpsStartTime) {
       this.fpsStartTime = now;
       return;
     }
 
     const elapsed = now - this.fpsStartTime;
     if (elapsed >= 1000) {
-      const currentFPS = (this.frameCount * 1000) / elapsed;
-      this.stats.processingFPS = Math.round(currentFPS * 10) / 10;
+      this.stats.processingFPS = Math.round(
+        ((this.frameCount * 1000) / elapsed) * 10,
+      ) / 10;
 
       this.frameCount = 0;
       this.fpsStartTime = now;
 
-      // 更新内存使用情况
       if ('memory' in performance) {
-        const memInfo = (performance as any).memory;
-        this.stats.memoryUsage = memInfo.usedJSHeapSize / (1024 * 1024);
+        const mem = (performance as Performance & {
+          memory: { usedJSHeapSize: number };
+        }).memory;
+        this.stats.memoryUsage = mem.usedJSHeapSize / (1024 * 1024);
       }
     }
   }
 
-  // 错误处理
-  private handleError(error: any): void {
-    this.errorCount++;
-    this.stats.lastError = error instanceof Error ? error.message : String(error);
+  /* -------------------------- 错误处理 ------------------------ */
+  private handleError(err: unknown): void {
+    this.errorCount += 1;
+    this.stats.lastError =
+      err instanceof Error ? err.message : String(err);
 
-    console.error(`❌ AR处理错误 (${this.errorCount}/${this.maxErrors}):`, error);
+    console.error(`❌ AR 处理错误 (${this.errorCount}/${this.maxErrors})`, err);
 
     if (this.errorCount >= this.maxErrors) {
-      console.error('💥 错误次数过多，自动禁用AR功能');
+      console.error('💥 错误过多，自动禁用 AR 功能');
       this.stop();
     }
   }
 
-  // 停止处理
+  /* ---------------------- 停止 / 清理 ------------------------ */
   stop(): void {
-    console.log('🛑 停止AR处理');
-
     this.isProcessing = false;
-
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
-
     this.sourceVideo = null;
   }
 
-  // 清理资源
   cleanup(): void {
-    console.log('🧹 清理AR处理器资源');
-
     this.stop();
-
     if (this.faceMesh) {
       try {
         this.faceMesh.close();
-      } catch (error) {
-        console.warn('⚠️ 清理MediaPipe失败:', error);
+      } catch (e) {
+        console.warn('⚠️ 清理 MediaPipe 失败:', e);
       }
       this.faceMesh = null;
     }
-
     this.outputCanvas = null;
     this.outputContext = null;
     this.stats.isInitialized = false;
   }
 
-  // 获取统计信息
+  /* --------------------- 对外公开的工具 ---------------------- */
   getStats(): ARStats {
     return { ...this.stats };
   }
 
-  // 更新配置
-  updateConfig(newConfig: Partial<ARConfig>): void {
-    this.config = { ...this.config, ...newConfig };
-    console.log('⚙️ AR配置已更新:', this.config);
+  updateConfig(cfg: Partial<ARConfig>): void {
+    this.config = { ...this.config, ...cfg };
+    console.log('⚙️ AR 配置已更新:', this.config);
   }
 
-  // 获取输出Canvas
   getOutputCanvas(): HTMLCanvasElement | null {
     return this.outputCanvas;
   }
 
-  // 检查是否正在处理
   isActive(): boolean {
     return this.isProcessing && this.stats.isInitialized;
   }

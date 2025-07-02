@@ -3,7 +3,7 @@
 // WebSocket 消息类型
 export interface WebSocketMessage {
   type: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // 加入房间消息
@@ -123,4 +123,26 @@ export interface RoomInfo {
   users: string[];
   user_count: number;
   created_at?: string;
+}
+
+// AR 模块配置接口
+export interface ARConfig {
+  enabled: boolean;
+  maxFaces: number;
+  minDetectionConfidence: number;
+  minTrackingConfidence: number;
+  targetWidth: number;
+  targetHeight: number;
+  maxProcessingFPS: number;
+  fallbackEnabled: boolean;
+}
+
+// AR 运行时状态
+export interface ARStats {
+  isInitialized: boolean;
+  faceDetected: boolean;
+  processingFPS: number;
+  lastError: string | null;
+  memoryUsage: number;
+  processingTime: number;
 }
