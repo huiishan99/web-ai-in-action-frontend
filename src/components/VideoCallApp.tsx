@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Video, Phone, PhoneOff, Users, Copy, CheckCircle } from 'lucide-react';
 
+/* 这里没用到所以注释
 interface SDPData {
   sdp: string;
   type: RTCSdpType;
@@ -8,6 +9,7 @@ interface SDPData {
   from?: string;
   to?: string;
 }
+*/
 
 interface User {
   id: string;
