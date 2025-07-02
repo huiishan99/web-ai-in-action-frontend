@@ -102,13 +102,30 @@ const VideoCallApp: React.FC = () => {
     }
   }, [userId]);
 
+
+  // 放到组件上方、initializePeerConnection 之后
+  const getLocalStream = React.useCallback(async (): Promise<MediaStream> => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      return stream;
+    } catch (err) {
+      console.error('获取媒体设备失败:', err);
+      throw err;
+    }
+  }, []);
+
+
   // 处理 WebSocket 消息
-  const handleWebSocketMessage = async (message: any) => {
-    switch (message.type) {
+  const handleWebSocketMessage = React.useCallback(async (message: unknown) => {
+    if (typeof message !== 'object' || message === null) return;
+    const msg = message as { type: string; [k: string]: unknown };
+    switch (msg.type) {
+      /* 将原来所有 message.xxx 改为 msg.xxx */
       case 'room_matched':
         // 房间匹配成功
-        if (peerConnectionRef.current && message.peer_offer) {
-          await peerConnectionRef.current.setRemoteDescription(message.peer_offer);
+        if (peerConnectionRef.current && msg.peer_offer) {
+          await peerConnectionRef.current.setRemoteDescription(msg.peer_offer);
           const answer = await peerConnectionRef.current.createAnswer();
           await peerConnectionRef.current.setLocalDescription(answer);
 
@@ -116,7 +133,7 @@ const VideoCallApp: React.FC = () => {
           wsRef.current?.send(JSON.stringify({
             type: 'answer',
             answer: answer,
-            target: message.peer_id
+            target: msg.peer_id
           }));
         }
         setIsInCall(true);
@@ -125,7 +142,7 @@ const VideoCallApp: React.FC = () => {
 
       case 'incoming_call':
         // 收到呼叫
-        const accept = window.confirm(`${message.from} 正在呼叫您，是否接受？`);
+        const accept = window.confirm(`${msg.from} 正在呼叫您，是否接受？`);
         if (accept) {
           await handleIncomingCall(message);
         } else {
@@ -134,7 +151,7 @@ const VideoCallApp: React.FC = () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              call_id: message.call_id,
+              call_id: msg.call_id,
               accept: false
             })
           });
@@ -143,8 +160,8 @@ const VideoCallApp: React.FC = () => {
 
       case 'call_accepted':
         // 呼叫被接受
-        if (peerConnectionRef.current && message.answer) {
-          await peerConnectionRef.current.setRemoteDescription(message.answer);
+        if (peerConnectionRef.current && msg.answer) {
+          await peerConnectionRef.current.setRemoteDescription(msg.answer);
           setIsInCall(true);
           setConnectionStatus('已连接');
         }
@@ -158,8 +175,8 @@ const VideoCallApp: React.FC = () => {
 
       case 'ice_candidate':
         // ICE 候选
-        if (peerConnectionRef.current && message.candidate) {
-          await peerConnectionRef.current.addIceCandidate(message.candidate);
+        if (peerConnectionRef.current && msg.candidate) {
+          await peerConnectionRef.current.addIceCandidate(msg.candidate);
         }
         break;
 
@@ -174,10 +191,14 @@ const VideoCallApp: React.FC = () => {
         endCall();
         break;
     }
-  };
+  }, [getLocalStream, initializePeerConnection]);
 
   // 处理来电
-  const handleIncomingCall = async (message: any) => {
+  const handleIncomingCall = async (message: {
+    from: string;
+    offer: RTCSessionDescriptionInit;
+    call_id: string;
+  }) => {
     try {
       const stream = await getLocalStream();
       localStreamRef.current = stream;
@@ -218,13 +239,13 @@ const VideoCallApp: React.FC = () => {
   };
 
   // 获取在线用户列表
-  const fetchOnlineUsers = async () => {
+  const fetchOnlineUsers = React.useCallback(async () => {
     if (!userId) return;
 
     try {
       const response = await fetch(`/api/online-users/${userId}`);
       const data = await response.json();
-      setOnlineUsers(data.users.map((user: any) => ({
+      setOnlineUsers(data.users.map((user: { id: string; status: string }) => ({
         id: user.id,
         name: user.id,
         isOnline: user.status === 'online'
@@ -232,24 +253,8 @@ const VideoCallApp: React.FC = () => {
     } catch (error) {
       console.error('获取在线用户失败:', error);
     }
-  };
-  const getLocalStream = async (): Promise<MediaStream> => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
-
-      return stream;
-    } catch (error) {
-      console.error('获取媒体设备失败:', error);
-      throw error;
-    }
-  };
+  }, [userId]);
+  
 
   // 房间模式：加入房间
   const joinRoom = async () => {
