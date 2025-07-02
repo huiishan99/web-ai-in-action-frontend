@@ -327,6 +327,7 @@ export default function RoomCall({ roomTheme }: RoomCallProps) {
       console.error('❌ 开始视频通话失败:', error);
       endVideoCall();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomTheme.videoRoomId, userId, getLocalStream, initializePeerConnection, connectWebSocket, isWaiting, isInCall, isWebSocketConnected]);
 
   // 结束视频通话
