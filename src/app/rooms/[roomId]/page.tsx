@@ -1,28 +1,16 @@
-// src/app/rooms/[roomId]/page.tsx
 import { notFound } from 'next/navigation';
-import { Metadata } from 'next';
+import type { Metadata } from 'next';
 import { getRoomTheme, isValidRoomId } from '@/config/rooms';
 import RoomPageClient from './RoomPageClient';
 
-// 使用 Next.js 提供的标准类型
-export interface RoomPageProps {
-  params: {
-    roomId: string;
-  };
-}
-
-export default function RoomPage({ params }: RoomPageProps) {
+export default function RoomPage({ params }: { params: { roomId: string } }) {
   const { roomId } = params;
 
-  // 验证房间ID是否有效
   if (!isValidRoomId(roomId)) {
     notFound();
   }
 
-  // 获取房间主题配置
   const roomTheme = getRoomTheme(roomId);
-
-  // 如果配置不存在，显示404
   if (!roomTheme) {
     notFound();
   }
@@ -30,7 +18,6 @@ export default function RoomPage({ params }: RoomPageProps) {
   return <RoomPageClient roomTheme={roomTheme} />;
 }
 
-// 生成静态参数（用于静态生成）
 export async function generateStaticParams() {
   return [
     { roomId: 'neutral' },
@@ -39,9 +26,8 @@ export async function generateStaticParams() {
   ];
 }
 
-// 正确标注元数据生成函数的类型（删除未使用参数）
 export async function generateMetadata(
-  { params }: RoomPageProps
+  { params }: { params: { roomId: string } }
 ): Promise<Metadata> {
   const { roomId } = params;
 
