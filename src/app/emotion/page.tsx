@@ -1,4 +1,6 @@
 // src/app/emotion/page.tsx
+"use client";
+
 import { useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import EmotionMeter from "@/components/emotion/EmotionMeter";
