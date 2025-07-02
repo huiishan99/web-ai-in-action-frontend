@@ -9,7 +9,7 @@ torch==2.5.0
 torchvision==0.20.0
 
 # --- ✅ NLP + Google Cloud NLP ---
-transformers==4.40.0
+transformers==4.50.0
 google-cloud-language==2.11.0
 google-auth==2.29.0
 google-auth-oauthlib==1.2.0
