@@ -1,9 +1,12 @@
+// src/app/rooms/[roomId]/page.tsx
+
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getRoomTheme, isValidRoomId } from '@/config/rooms';
 import RoomPageClient from './RoomPageClient';
+import type { PageProps } from '@/types/next'; // 使用你定义的类型
 
-export default function RoomPage({ params }: { params: { roomId: string } }) {
+export default function RoomPage({ params }: PageProps<{ roomId: string }>) {
   const { roomId } = params;
 
   if (!isValidRoomId(roomId)) {
@@ -18,6 +21,7 @@ export default function RoomPage({ params }: { params: { roomId: string } }) {
   return <RoomPageClient roomTheme={roomTheme} />;
 }
 
+// 静态参数
 export async function generateStaticParams() {
   return [
     { roomId: 'neutral' },
@@ -26,8 +30,9 @@ export async function generateStaticParams() {
   ];
 }
 
+// 元数据
 export async function generateMetadata(
-  { params }: { params: { roomId: string } }
+  { params }: PageProps<{ roomId: string }>
 ): Promise<Metadata> {
   const { roomId } = params;
 
