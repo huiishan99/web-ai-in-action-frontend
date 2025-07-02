@@ -165,6 +165,6 @@ export function getAllRooms() {
 }
 
 // 类型守卫
-export function isValidRoomId(roomId: string): roomId is keyof typeof ROOM_CONFIGS {
+export function isValidRoomId(roomId: string): roomId is (keyof typeof ROOM_CONFIGS & string) {
   return roomId in ROOM_CONFIGS;
 }
