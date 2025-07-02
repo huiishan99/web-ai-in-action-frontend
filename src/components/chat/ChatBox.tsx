@@ -24,10 +24,10 @@ export default function ChatBox() {
   // 聊天记录映射：每个用户有自己的消息数组
   const [chatMap, setChatMap] = useState<Record<string, Message[]>>({
     Alicia: [
-      { id: 1, from: 'other', text: '嗨，我是 Alicia！' },
-      { id: 2, from: 'me', text: '你好呀～' },
+      { id: 1, from: 'other', text: 'Hi，I am Alicia!' },
+      { id: 2, from: 'me', text: 'Hello, how are you?' },
     ],
-    Bob: [{ id: 3, from: 'other', text: '我是 Bob，有什么事？' }],
+    Bob: [{ id: 3, from: 'other', text: 'I am Bob. How are you?' }],
     Charlie: [],
   });
 
@@ -47,6 +47,9 @@ export default function ChatBox() {
     setInput('');
   };
 
+  // 当前聊天对象头像（用于 ChatMessage 显示）
+  const currentContact = CONTACTS.find((c) => c.name === currentUser);
+
   return (
     <div className="flex flex-1 h-screen">
       <ContactList
@@ -57,12 +60,17 @@ export default function ChatBox() {
 
       <div className="flex flex-col flex-1 bg-gray-50 p-4">
         <h2 className="text-xl font-bold mb-2 text-blue-800">
-          与 {currentUser} 的对话
+          {currentUser}
         </h2>
 
         <div className="flex-1 overflow-y-auto space-y-2">
           {(chatMap[currentUser] || []).map((msg) => (
-            <ChatMessage key={msg.id} from={msg.from} text={msg.text} />
+            <ChatMessage
+              key={msg.id}
+              from={msg.from}
+              text={msg.text}
+              avatar={msg.from === 'other' ? currentContact?.avatar : undefined}
+            />
           ))}
         </div>
 
@@ -71,7 +79,8 @@ export default function ChatBox() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             className="flex-1 rounded-md border border-gray-300 px-4 py-2"
-            placeholder="输入消息..."
+            placeholder="Enter message...
+"
           />
 
           {/* 语音输入按钮 */}
@@ -85,10 +94,6 @@ export default function ChatBox() {
           </button>
         </div>
       </div>
-
     </div>
-
-
-
   );
 }
