@@ -1,6 +1,7 @@
 // app/api/room-matching/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { MongoClient, Db, Collection, Document } from 'mongodb';
+import { requireMongoUri } from '@/lib/mongodb-config.cjs';
 
 // 定义房间类型结构
 interface Room {
@@ -27,9 +28,7 @@ class RoomMatcher {
   }
 
   async connect() {
-    const MONGO_URI =
-      process.env.MONGODB_URI ||
-      'MONGODB_URI_REMOVED';
+    const MONGO_URI = requireMongoUri();
     const DB_NAME = 'room_matching_db';
     const COLLECTION_NAME = 'rooms';
 
