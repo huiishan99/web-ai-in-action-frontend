@@ -1,9 +1,9 @@
 //room_matching_script.js
 
 const { MongoClient } = require('mongodb');
+const { requireMongoUri } = require('../src/lib/mongodb-config.cjs');
 
 // MongoDB Atlas连接配置
-const MONGO_URI = 'MONGODB_URI_REMOVED'; // 替换为你的实际Atlas连接字符串
 const DB_NAME = 'room_matching_db';
 const COLLECTION_NAME = 'rooms';
 
@@ -16,6 +16,7 @@ class RoomMatcher {
 
     // 连接MongoDB
     async connect() {
+        const MONGO_URI = requireMongoUri();
         try {
             this.client = new MongoClient(MONGO_URI);
             await this.client.connect();

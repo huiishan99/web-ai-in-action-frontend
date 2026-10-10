@@ -10,7 +10,14 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  { ignores: [".next/**", "out/**", "build/**", "next-env.d.ts"] },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 ];
+
+eslintConfig.push({
+  // The standalone CLI and shared config retain their CommonJS interface.
+  files: ["backend/room_matching_script.js", "src/lib/mongodb-config.cjs"],
+  rules: { "@typescript-eslint/no-require-imports": "off" },
+});
 
 export default eslintConfig;
