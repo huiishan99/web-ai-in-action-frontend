@@ -12,7 +12,8 @@
     "dev:full": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "setup:backend": "cd backend && python -m venv venv && venv\\Scripts\\activate && pip install -r requirements.txt",
     "typecheck": "next typegen && tsc --noEmit",
-    "test:security": "node --test tests/mongodb-configuration.test.mjs"
+    "test:security": "node --test tests/mongodb-configuration.test.mjs",
+    "test:glob-adapter": "node --test tests/next-glob-adapter.test.mjs tests/next-eslint-configuration.test.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.16.0",
@@ -32,9 +33,13 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.27",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "braces": "file:./tools/next-eslint-braces"
   },
   "overrides": {
-    "postcss": "8.5.29"
+    "postcss": "8.5.29",
+    "micromatch@4.0.8": {
+      "braces": "$braces"
+    }
   }
 }

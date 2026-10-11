@@ -1,0 +1,14 @@
+{
+  "name": "@ai-in-action/next-brace-expansion-adapter",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Prototype for the normalized Next 15 fast-glob brace expansion call",
+  "type": "commonjs",
+  "main": "index.cjs",
+  "engines": {
+    "node": "20 || >=22"
+  },
+  "dependencies": {
+    "brace-expansion": "5.0.12"
+  }
+}
