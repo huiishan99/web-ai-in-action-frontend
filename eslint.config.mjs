@@ -16,7 +16,7 @@ const eslintConfig = [
 
 eslintConfig.push({
   // The standalone CLI and shared config retain their CommonJS interface.
-  files: ["backend/room_matching_script.js", "src/lib/mongodb-config.cjs"],
+  files: ["backend/room_matching_script.js", "src/lib/mongodb-config.cjs", "tools/next-eslint-braces/index.cjs"],
   rules: { "@typescript-eslint/no-require-imports": "off" },
 });
 

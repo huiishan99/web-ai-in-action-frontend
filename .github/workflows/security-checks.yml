@@ -1,0 +1,48 @@
+name: Security and regression checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      CI: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.23.3'
+          cache: npm
+      - name: Strict installation
+        run: npm ci --ignore-scripts --strict-peer-deps --legacy-peer-deps=false --no-audit --no-fund
+      - name: Full audit
+        run: npm audit
+      - name: Production audit
+        run: npm audit --omit=dev
+      - name: Registry signatures
+        run: npm audit signatures
+      - name: Security tests
+        run: npm run test:security
+      - name: Adapter and effective Next configuration
+        run: npm run test:glob-adapter
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Production build
+        run: npm run build

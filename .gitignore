@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/tools/next-eslint-braces/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
